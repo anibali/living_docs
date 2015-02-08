@@ -106,6 +106,7 @@ module LivingDocs
 
       cursor.visit_children do |cursor, parent|
         file_location = cursor.location.file_location
+        short_file = relative_path(file_location.file, @input_dir)
 
         # Skip code locations we have already visited
         location_string = "#{file_location.file}:#{file_location.offset}"
@@ -131,8 +132,6 @@ module LivingDocs
               comment_text = clean_comment(cursor.raw_comment_text)
 
               # TODO: Handle conflicts (eg declaration vs definition)
-
-              short_file = relative_path(file_location.file, @input_dir)
 
               @renderer.code_blocks.clear
               description = @markdown.render(comment_text)
