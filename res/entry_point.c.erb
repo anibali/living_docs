@@ -1,0 +1,15 @@
+#include "stdlib.h"
+#include "living_docs.h"
+
+<% example_function_names.each do |function_name| %>
+void <%= function_name %>();
+<% end %>
+
+<%= preamble %>
+
+void __living_docs_entry_point() {
+<% example_function_names.each do |function_name| %>
+  <%= function_name %>();
+<% end %>
+  exit(0);
+}

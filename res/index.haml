@@ -1,0 +1,24 @@
+%html
+  %head
+    %title Living docs
+    %link(rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.2/css/bootstrap.min.css")
+    %link(rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.2/css/bootstrap-theme.min.css")
+    %script(src="https://code.jquery.com/jquery-1.11.2.min.js")
+    %script(src="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.2/js/bootstrap.min.js")
+    %style= Pygments.css('.highlight', :style => "monokai")
+    :css
+      .highlight pre {
+        background-color: inherit;
+        border: none;
+      }
+      .highlight {
+        border-radius: 4px;
+      }
+  %body.container
+    .row
+      .col-lg-10.col-lg-offset-1
+        - documentation.each do |function_name, description|
+          %h1= function_name
+          %div
+            = preserve do
+              != description
