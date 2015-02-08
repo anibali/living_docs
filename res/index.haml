@@ -5,20 +5,49 @@
     %link(rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.2/css/bootstrap-theme.min.css")
     %script(src="https://code.jquery.com/jquery-1.11.2.min.js")
     %script(src="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.2/js/bootstrap.min.js")
-    %style= Pygments.css('.highlight', :style => "monokai")
+    %style= Pygments.css('.highlight', :style => "default")
     :css
       .highlight pre {
         background-color: inherit;
         border: none;
       }
       .highlight {
-        border-radius: 4px;
+        border-left: 1px #bbb solid;
       }
-  %body.container
+      #sidebar {
+        padding: 6px;
+      }
+      #content {
+        padding: 6px;
+      }
+      #content h2 {
+        font-size: 1.5em;
+        border-bottom: 1px #bbb solid;
+      }
+      #content .fn-heading {
+        font-size: 1.1em;
+        background-color: #ddeeff;
+        padding: 6px;
+        border-radius: 4px;
+        font-family: monospace;
+        border: 1px #bbb solid;
+      }
+  %body
     .row
-      .col-lg-10.col-lg-offset-1
-        - documentation.each do |function_name, description|
-          %h1= function_name
-          %div
-            = preserve do
-              != description
+      .col-sm-2
+        #sidebar
+          .list-group
+            - files.each do |file|
+              %a.list-group-item{href: file.gsub(/\W/, "_") + ".html", class: file == current_file ? "active" : ""}
+                = file
+      .col-sm-10
+        #content
+          %h1
+            File:
+            = current_file
+          %h2 Function details
+          - documentation.each do |details|
+            %h3.fn-heading= details.fetch(:function)
+            %div.fn-desc
+              = preserve do
+                != details.fetch(:description)

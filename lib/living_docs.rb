@@ -40,8 +40,8 @@ module LivingDocs
       @src_dir = File.join(input_dir, "src")
       @include_dir = File.join(input_dir, "include")
       @project_files = (
-        Dir[File.join(@include_dir, "**/*")] +
-        Dir[File.join(@src_dir, "**/*")]
+        Dir[File.join(@include_dir, "**/*.h")] +
+        Dir[File.join(@src_dir, "**/*.c")]
       ).select {|f| File.file?(f)}
 
       @example_code = {}
@@ -96,6 +96,10 @@ module LivingDocs
       end
     end
 
+    def relative_path(path, relative_to)
+      Pathname.new(File.absolute_path(path)).relative_path_from(Pathname.new(relative_to)).to_s
+    end
+
     def process_file(file_path)
       translation_unit = @index.parse_translation_unit(file_path, ["-I#{@include_dir}"])
       cursor = translation_unit.cursor
@@ -112,27 +116,41 @@ module LivingDocs
         # (like stdio.h or something)
         if @project_files.include?(file_location.file)
           if cursor.kind == :cursor_function
-            # Use raw comment to avoid clobbering of \n & co due
-            # to misinterpretation as documentation commands
-            next :recurse if cursor.raw_comment_text.nil?
-            comment_text = clean_comment(cursor.raw_comment_text)
-
             function_name = cursor.spelling
+            return_type = cursor.type.result_type.spelling
+            arg_list = (0...cursor.num_arguments).map do |i|
+              [cursor.type.arg_type(i).spelling,
+              cursor.argument(i).spelling].join(" ")
+            end.join(", ")
+            function_signature = "#{return_type} #{function_name}(#{arg_list})"
+            description = ""
 
-            # TODO: Handle conflicts (eg declaration vs definition)
+            if cursor.raw_comment_text
+              # Use raw comment to avoid clobbering of \n & co due
+              # to misinterpretation as documentation commands
+              comment_text = clean_comment(cursor.raw_comment_text)
 
-            @renderer.code_blocks.clear
-            @documentation[function_name] = @markdown.render(comment_text)
+              # TODO: Handle conflicts (eg declaration vs definition)
 
-            function_examples = []
-            @renderer.code_blocks.each_with_index do |example, i|
-              function_examples << example.split("\n").map(&:strip).join("\n")
+              short_file = relative_path(file_location.file, @input_dir)
+
+              @renderer.code_blocks.clear
+              description = @markdown.render(comment_text)
+
+              function_examples = []
+              @renderer.code_blocks.each_with_index do |example, i|
+                function_examples << example.split("\n").map(&:strip).join("\n")
+              end
+
+              @example_code[function_name] = {
+                file: short_file,
+                examples: function_examples
+              }
             end
 
-            @example_code[function_name] = {
-              file: Pathname.new(File.absolute_path(file_location.file))
-                .relative_path_from(Pathname.new(@input_dir)).to_s,
-              examples: function_examples
+            (@documentation[short_file] ||= []) << {
+              function: function_signature,
+              description: description
             }
           end
         end
@@ -223,9 +241,16 @@ module LivingDocs
 
       return 1 unless compile_status.zero?
 
+      files = @project_files.map {|file| relative_path(file, @input_dir)}.sort
       haml = Haml::Engine.new(File.read(resource_path("index.haml")))
-      html = haml.render(Object.new, documentation: @documentation)
-      open(File.join(@output_dir, "index.html"), 'w') {|f| f.puts(html) }
+
+      files.each do |file|
+        html = haml.render(Object.new,
+          documentation: @documentation[file],
+          current_file: file,
+          files: files)
+        open(File.join(@output_dir, file.gsub(/\W/, "_") + ".html"), 'w') {|f| f.puts(html) }
+      end
 
       0
     end
