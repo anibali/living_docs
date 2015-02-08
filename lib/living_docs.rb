@@ -195,8 +195,9 @@ module LivingDocs
             example_function_names << example_function_name
             function_defs = appended_code[info.fetch(:file)] || []
             function_defs << [
-              "void #{example_function_name}() {",
+              "int #{example_function_name}() {",
               example_code,
+              "return 0;",
               "}"
             ].join("\n")
             appended_code[info.fetch(:file)] = function_defs
