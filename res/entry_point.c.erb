@@ -12,6 +12,8 @@ void __living_docs_entry_point() {
   printf("Running examples...\n");
   int failed = 0;
   int total = <%= example_function_names.length %>;
+  __n_failure_messages = 0;
+  __failure_messages = malloc(sizeof(char*) * total);
 <% example_function_names.each do |function_name| %>
   if(<%= function_name %>()) {
     ++failed;
@@ -22,9 +24,17 @@ void __living_docs_entry_point() {
   fflush(stdout);
 <% end %>
   if(failed) {
-    printf("\n\n\x1b[31m%d/%d examples failed.\x1b[0m\n", failed, total);
+    printf("\n\n\x1b[31mFailed checks:\x1b[0m\n");
+    for(int i = 0; i < __n_failure_messages; ++i) {
+      if(i % 2) printf("\x1b[33m");
+      printf("%s\n", __failure_messages[i]);
+      printf("\x1b[0m");
+      free(__failure_messages[i]);
+    }
+    printf("\n\x1b[31m%d/%d examples failed.\x1b[0m\n", failed, total);
   } else {
     printf("\n\n\x1b[32mAll %d examples ran successfully.\x1b[0m\n", total);
   }
+  free(__failure_messages);
   exit(0);
 }
