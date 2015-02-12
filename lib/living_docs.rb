@@ -119,11 +119,10 @@ module LivingDocs
           if cursor.kind == :cursor_function
             function_name = cursor.spelling
             return_type = cursor.type.result_type.spelling
-            arg_list = (0...cursor.num_arguments).map do |i|
+            parameters = (0...cursor.num_arguments).map do |i|
               [cursor.type.arg_type(i).spelling,
               cursor.argument(i).spelling].join(" ")
-            end.join(", ")
-            function_signature = "#{return_type} #{function_name}(#{arg_list})"
+            end
             description = ""
 
             if cursor.raw_comment_text
@@ -148,7 +147,11 @@ module LivingDocs
             end
 
             (@documentation[short_file] ||= []) << {
-              function: function_signature,
+              function: {
+                name: function_name,
+                parameters: parameters,
+                return_type: return_type
+              },
               description: description
             }
           end
@@ -246,7 +249,7 @@ module LivingDocs
 
       files.each do |file|
         html = haml.render(Object.new,
-          documentation: @documentation[file],
+          documentation: @documentation.fetch(file).sort_by {|h| h.fetch(:function).fetch(:name)},
           current_file: file,
           files: files)
         open(File.join(@output_dir, file.gsub(/\W/, "_") + ".html"), 'w') {|f| f.puts(html) }

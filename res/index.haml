@@ -47,7 +47,11 @@
             = current_file
           %h2 Function details
           - documentation.each do |details|
-            %h3.fn-heading= details.fetch(:function)
+            %h3.fn-heading
+              %b= details.fetch(:function).fetch(:name)
+              = "(" + details.fetch(:function).fetch(:parameters).join(", ") + ")"
+              &rarr;
+              = details.fetch(:function).fetch(:return_type)
             %div.fn-desc
               = preserve do
                 != details.fetch(:description)
