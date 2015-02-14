@@ -19,7 +19,7 @@ module LivingDocs
       @project_files = (
         Dir[File.join(@include_dir, "**/*.h")] +
         Dir[File.join(@src_dir, "**/*.c")]
-      ).select {|f| File.file?(f)}
+      ).select {|f| File.file?(f)}.to_set
 
       @example_code = {}
       @documentation = {}
@@ -54,15 +54,15 @@ module LivingDocs
         file_location = cursor.location.file_location
         short_file = Utils.relative_path(file_location.file, @input_dir)
 
-        # Skip code locations we have already visited
-        location_string = "#{file_location.file}:#{file_location.offset}"
-        next :recurse if @seen.include?(location_string)
-        @seen << location_string
-
         # Check that function is from a project file and not somewhere else
         # (like stdio.h or something)
         if @project_files.include?(file_location.file)
           if cursor.kind == :cursor_function
+            # Skip code locations we have already visited
+            location_string = "#{file_location.file}:#{file_location.offset}"
+            next :recurse if @seen.include?(location_string)
+            @seen << location_string
+
             function_name = cursor.spelling
             return_type = cursor.type.result_type.spelling
             parameters = (0...cursor.num_arguments).map do |i|
@@ -75,8 +75,6 @@ module LivingDocs
               # Use raw comment to avoid clobbering of \n & co due
               # to misinterpretation as documentation commands
               comment_text = Utils.clean_comment(cursor.raw_comment_text)
-
-              # TODO: Handle conflicts (eg declaration vs definition)
 
               description = @markdown.render(comment_text)
 
@@ -91,6 +89,8 @@ module LivingDocs
               }
             end
 
+            # TODO: Handle conflicts (eg declaration vs definition)
+
             (@documentation[short_file] ||= []) << {
               function: {
                 name: function_name,
@@ -104,10 +104,6 @@ module LivingDocs
 
         :recurse
       end
-    end
-
-    def render_erb(resource_name, binding={})
-      Erubis::Eruby.new(File.read(Utils.resource_path(resource_name))).result(binding)
     end
 
     def run
@@ -163,7 +159,7 @@ module LivingDocs
         end
 
         # Create entry point
-        entry_point_code = render_erb("entry_point.c.erb",
+        entry_point_code = Utils.render_erb("entry_point.c.erb",
           preamble: entry_point_preamble,
           example_function_names: example_function_names)
 

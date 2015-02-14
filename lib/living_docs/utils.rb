@@ -46,6 +46,11 @@ module LivingDocs
         nil
       end
     end
+
+    def render_erb(resource_name, binding={})
+      erb_template = File.read(resource_path(resource_name))
+      Erubis::Eruby.new(erb_template).result(binding)
+    end
   end
 
   module Utils
