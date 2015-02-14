@@ -22,7 +22,6 @@ module LivingDocs
         Dir[File.join(@src_dir, "**/*.c")]
       ).select {|f| File.file?(f)}.to_set
 
-      @example_code = {}
       @documented_functions = {}
 
       @index = FFI::Clang::Index.new
@@ -78,6 +77,7 @@ module LivingDocs
               cursor.argument(i).spelling].join(" ")
             end
             description = ""
+            examples = []
 
             if cursor.raw_comment_text
               # Use raw comment to avoid clobbering of \n & co due
@@ -86,15 +86,10 @@ module LivingDocs
 
               description = @markdown.render(comment_text)
 
-              function_examples = []
               extract_code_blocks(comment_text).each_with_index do |example, i|
-                function_examples << example.split("\n").map(&:strip).join("\n")
+                code = example.split("\n").map(&:strip).join("\n")
+                examples << Documentation::CodeExample.new(short_file, code)
               end
-
-              @example_code[function_name] = {
-                file: short_file,
-                examples: function_examples
-              }
             end
 
             function = Documentation::Function.new
@@ -102,6 +97,7 @@ module LivingDocs
             function.parameters = parameters
             function.return_type = return_type
             function.description = description
+            function.examples = examples
 
             unit_functions[function_name] << function
           end
@@ -144,25 +140,25 @@ module LivingDocs
         FileUtils.cp(Utils.resource_path("living_docs.h"), tmp_include_dir)
 
         example_function_names = []
+        example_function_defs = {}
 
-        appended_code = {}
-        @example_code.each do |function_name, info|
-          info.fetch(:examples).each_with_index do |example_code, i|
-            example_function_name = "__example_#{function_name}_#{i}"
-            example_function_names << example_function_name
-            function_defs = appended_code[info.fetch(:file)] || []
-            function_defs << [
-              "int #{example_function_name}() {",
-              example_code,
-              "return 0;",
-              "}"
-            ].join("\n")
-            appended_code[info.fetch(:file)] = function_defs
-          end
+        examples_with_function_name = @documented_functions
+          .flat_map {|k, v| v.values.flat_map {|fn| fn.examples.map {|example| [fn.name, example]}}}
+          .uniq
+        examples_with_function_name.each_with_index do |(function_name, example), i|
+          example_function_name = "__example_#{function_name}_#{i}"
+          example_function_names << example_function_name
+          example_function_def = [
+            "int #{example_function_name}() {",
+            example.code,
+            "return 0;",
+            "}"
+          ].join("\n")
+          (example_function_defs[example.file] ||= []) << example_function_def
         end
 
         entry_point_preamble = ""
-        appended_code.each do |file_name, function_defs|
+        example_function_defs.each do |file_name, function_defs|
           if File.extname(file_name) == ".h"
             #FIXME: get include file name in a better way than split/join
             entry_point_preamble << "#include \"#{File.join(*file_name.split('/')[1..-1])}\"\n"
