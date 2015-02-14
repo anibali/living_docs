@@ -46,13 +46,13 @@
             File:
             = current_file
           %h2 Function details
-          - documentation.each do |details|
+          - functions.each do |function|
             %h3.fn-heading
-              %b= details.fetch(:function).fetch(:name)
-              = "(" + details.fetch(:function).fetch(:parameters).join(", ") + ")"
+              %b= function.name
+              = "(" + function.parameters.join(", ") + ")"
               &rarr;
-              = details.fetch(:function).fetch(:return_type)
+              = function.return_type
             %div.fn-desc
               = preserve do
-                != details.fetch(:description)
+                != function.description
             %hr

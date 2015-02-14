@@ -8,6 +8,7 @@ require 'erubis'
 
 require 'living_docs/utils'
 require 'living_docs/markdown'
+require 'living_docs/documentation'
 
 module LivingDocs
   class Processor
@@ -22,8 +23,7 @@ module LivingDocs
       ).select {|f| File.file?(f)}.to_set
 
       @example_code = {}
-      @documentation = {}
-      @seen = Set.new
+      @documented_functions = {}
 
       @index = FFI::Clang::Index.new
 
@@ -50,6 +50,9 @@ module LivingDocs
       translation_unit = @index.parse_translation_unit(file_path, ["-I#{@include_dir}"])
       cursor = translation_unit.cursor
 
+      unit_functions = {}
+      unit_file_functions = {}
+
       cursor.visit_children do |cursor, parent|
         file_location = cursor.location.file_location
         short_file = Utils.relative_path(file_location.file, @input_dir)
@@ -58,12 +61,17 @@ module LivingDocs
         # (like stdio.h or something)
         if @project_files.include?(file_location.file)
           if cursor.kind == :cursor_function
-            # Skip code locations we have already visited
-            location_string = "#{file_location.file}:#{file_location.offset}"
-            next :recurse if @seen.include?(location_string)
-            @seen << location_string
-
             function_name = cursor.spelling
+
+            unit_functions[function_name] ||= []
+            (unit_file_functions[short_file] ||= Set.new) << function_name
+
+            # Don't reprocess code we've already parsed
+            if @documented_functions[short_file] and @documented_functions[short_file].has_key?(function_name)
+              unit_functions[function_name] << @documented_functions.fetch(short_file).fetch(function_name)
+              next :recurse
+            end
+
             return_type = cursor.type.result_type.spelling
             parameters = (0...cursor.num_arguments).map do |i|
               [cursor.type.arg_type(i).spelling,
@@ -89,20 +97,29 @@ module LivingDocs
               }
             end
 
-            # TODO: Handle conflicts (eg declaration vs definition)
+            function = Documentation::Function.new
+            function.name = function_name
+            function.parameters = parameters
+            function.return_type = return_type
+            function.description = description
 
-            (@documentation[short_file] ||= []) << {
-              function: {
-                name: function_name,
-                parameters: parameters,
-                return_type: return_type
-              },
-              description: description
-            }
+            unit_functions[function_name] << function
           end
         end
 
         :recurse
+      end
+
+      merged_function_docs = Hash[unit_functions.map do |function_name, doc_options|
+        [function_name, doc_options.reduce(&:merge)]
+      end]
+
+      unit_file_functions.each do |file, functions|
+        @documented_functions[file] ||= {}
+
+        functions.each do |function_name|
+          @documented_functions[file][function_name] = merged_function_docs[function_name]
+        end
       end
     end
 
@@ -185,9 +202,13 @@ module LivingDocs
       haml = Haml::Engine.new(File.read(Utils.resource_path("index.haml")))
 
       files.each do |file|
-        documentation = @documentation[file] || []
+        if @documented_functions[file]
+          functions = @documented_functions[file].values.sort_by(&:name)
+        else
+          functions = []
+        end
         html = haml.render(Object.new,
-          documentation: documentation.sort_by {|h| h.fetch(:function).fetch(:name)},
+          functions: functions,
           current_file: file,
           files: files)
         open(File.join(@output_dir, file.gsub(/\W/, "_") + ".html"), 'w') {|f| f.puts(html) }
