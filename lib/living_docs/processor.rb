@@ -189,8 +189,9 @@ module LivingDocs
       haml = Haml::Engine.new(File.read(Utils.resource_path("index.haml")))
 
       files.each do |file|
+        documentation = @documentation[file] || []
         html = haml.render(Object.new,
-          documentation: @documentation.fetch(file).sort_by {|h| h.fetch(:function).fetch(:name)},
+          documentation: documentation.sort_by {|h| h.fetch(:function).fetch(:name)},
           current_file: file,
           files: files)
         open(File.join(@output_dir, file.gsub(/\W/, "_") + ".html"), 'w') {|f| f.puts(html) }
