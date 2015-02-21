@@ -54,5 +54,5 @@
               = function.return_type
             %div.fn-desc
               = preserve do
-                != function.description
+                != markdown.render(function.description)
             %hr

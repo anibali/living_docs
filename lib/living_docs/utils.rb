@@ -1,5 +1,8 @@
 require 'pathname'
 
+require 'living_docs/code_example'
+require 'living_docs/markdown'
+
 module LivingDocs
   RESOURCE_DIR = File.expand_path("../../../res", __FILE__).freeze
 
@@ -44,6 +47,17 @@ module LivingDocs
         unindent_text(comment_text.gsub(/^\/\/\//, ''))
       else
         nil
+      end
+    end
+
+    def extract_code_examples(markdown_text, short_file)
+      code_extractor = Markdown::CodeBlockExtractor.new('c')
+      Redcarpet::Markdown.new(code_extractor, Markdown::OPTIONS).render(markdown_text)
+      code_blocks = code_extractor.code_blocks['c'] || []
+
+      code_blocks.zip(0..code_blocks.size).map do |(example, i)|
+        code = example.split("\n").map(&:strip).join("\n")
+        CodeExample.new(short_file, code)
       end
     end
 

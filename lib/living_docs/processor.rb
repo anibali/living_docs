@@ -9,9 +9,13 @@ require 'erubis'
 require 'living_docs/utils'
 require 'living_docs/markdown'
 require 'living_docs/documentation'
+require 'living_docs/code_example'
 
 module LivingDocs
   class Processor
+    EXIT_SUCCESS = 0
+    EXIT_FAILURE = 1
+
     def initialize(input_dir, output_dir)
       @output_dir = File.absolute_path(output_dir)
       @input_dir = File.absolute_path(input_dir)
@@ -27,22 +31,7 @@ module LivingDocs
       @index = FFI::Clang::Index.new
 
       @renderer = Markdown::HtmlRenderer.new('c')
-      @markdown_options = {
-        nowrap: true,
-        autolink: true,
-        no_intra_emphasis: true,
-        fenced_code_blocks: true,
-        lax_html_blocks: true,
-        strikethrough: true,
-        superscript: true
-      }
-      @markdown = Redcarpet::Markdown.new(@renderer, @markdown_options)
-    end
-
-    def extract_code_blocks(markdown_text)
-      code_extractor = Markdown::CodeBlockExtractor.new('c')
-      Redcarpet::Markdown.new(code_extractor, @markdown_options).render(markdown_text)
-      code_extractor.code_blocks['c'] || []
+      @markdown = Redcarpet::Markdown.new(@renderer, Markdown::OPTIONS)
     end
 
     def process_file(file_path)
@@ -50,7 +39,6 @@ module LivingDocs
       cursor = translation_unit.cursor
 
       unit_functions = {}
-      unit_file_functions = {}
 
       cursor.visit_children do |cursor, parent|
         file_location = cursor.location.file_location
@@ -59,61 +47,49 @@ module LivingDocs
         # Check that function is from a project file and not somewhere else
         # (like stdio.h or something)
         if @project_files.include?(file_location.file)
-          if cursor.kind == :cursor_function
+          if cursor.kind == :cursor_typedef_decl
+            # p cursor.spelling
+            # p cursor.underlying_type.spelling
+          elsif cursor.kind == :cursor_struct
+            # # TODO: anonymous if cursor.spelling == ""
+            # puts cursor.type.spelling
+            # cursor.visit_children do |child|
+            #   if child.kind == :cursor_field_decl
+            #     puts child.type.spelling, child.spelling
+            #   end
+            #   :recurse
+            # end
+          elsif cursor.kind == :cursor_function
             function_name = cursor.spelling
 
-            unit_functions[function_name] ||= []
-            (unit_file_functions[short_file] ||= Set.new) << function_name
+            unit_functions[short_file] ||= []
 
             # Don't reprocess code we've already parsed
             if @documented_functions[short_file] and @documented_functions[short_file].has_key?(function_name)
-              unit_functions[function_name] << @documented_functions.fetch(short_file).fetch(function_name)
+              unit_functions[short_file] << @documented_functions.fetch(short_file).fetch(function_name)
               next :recurse
             end
 
-            return_type = cursor.type.result_type.spelling
-            parameters = (0...cursor.num_arguments).map do |i|
-              [cursor.type.arg_type(i).spelling,
-              cursor.argument(i).spelling].join(" ")
-            end
-            description = ""
-            examples = []
-
-            if cursor.raw_comment_text
-              # Use raw comment to avoid clobbering of \n & co due
-              # to misinterpretation as documentation commands
-              comment_text = Utils.clean_comment(cursor.raw_comment_text)
-
-              description = @markdown.render(comment_text)
-
-              extract_code_blocks(comment_text).each_with_index do |example, i|
-                code = example.split("\n").map(&:strip).join("\n")
-                examples << Documentation::CodeExample.new(short_file, code)
-              end
-            end
-
-            function = Documentation::Function.new
-            function.name = function_name
-            function.parameters = parameters
-            function.return_type = return_type
-            function.description = description
-            function.examples = examples
-
-            unit_functions[function_name] << function
+            unit_functions[short_file] << Documentation::Function.new(cursor, short_file)
           end
         end
 
         :recurse
       end
 
-      merged_function_docs = Hash[unit_functions.map do |function_name, doc_options|
-        [function_name, doc_options.reduce(&:merge)]
-      end]
+      # Merge all documentation for functions with the same name in this
+      # translation unit (that is, declarations and definitions)
+      merged_function_docs = Hash[
+        unit_functions.values.flatten.group_by(&:name).map do |function_name, doc_options|
+          [function_name, doc_options.reduce(&:merge)]
+        end
+      ]
 
-      unit_file_functions.each do |file, functions|
+      unit_functions.each do |file, functions|
         @documented_functions[file] ||= {}
 
-        functions.each do |function_name|
+        # Use merged docs for each function in this file
+        functions.map(&:name).each do |function_name|
           @documented_functions[file][function_name] = merged_function_docs[function_name]
         end
       end
@@ -192,7 +168,7 @@ module LivingDocs
         compile_status = $?.exitstatus
       end
 
-      return 1 unless compile_status.zero?
+      return EXIT_FAILURE unless compile_status.zero?
 
       files = @project_files.map {|file| Utils.relative_path(file, @input_dir)}.sort
       haml = Haml::Engine.new(File.read(Utils.resource_path("index.haml")))
@@ -204,14 +180,14 @@ module LivingDocs
           functions = []
         end
         html = haml.render(Object.new,
+          markdown: @markdown,
           functions: functions,
           current_file: file,
           files: files)
         open(File.join(@output_dir, file.gsub(/\W/, "_") + ".html"), 'w') {|f| f.puts(html) }
       end
 
-      # Successful exit code
-      0
+      EXIT_SUCCESS
     end
   end
 end

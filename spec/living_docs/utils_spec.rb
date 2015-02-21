@@ -24,4 +24,20 @@ describe LivingDocs::Utils do
       expect(File).to exist(path)
     end
   end
+
+  describe '.clean_comment' do
+    it 'cleans ///-style comments' do
+      comment = "/// This is a comment"
+      cleaned_comment = "This is a comment"
+
+      expect(LivingDocs::Utils.clean_comment(comment)).to eq(cleaned_comment)
+    end
+
+    it 'cleans /**-style comments' do
+      comment = "/**\n * This is a comment\n */"
+      cleaned_comment = "This is a comment"
+
+      expect(LivingDocs::Utils.clean_comment(comment)).to eq(cleaned_comment)
+    end
+  end
 end
