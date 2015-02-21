@@ -32,6 +32,21 @@
         font-family: monospace;
         border: 1px #bbb solid;
       }
+      #content .struct-heading {
+        font-size: 1.1em;
+        background-color: #eeffdd;
+        padding: 6px;
+        border-radius: 4px;
+        font-family: monospace;
+        border: 1px #bbb solid;
+      }
+      #content .struct-def {
+        font-family: monospace;
+        border: 1px solid #ccc;
+        padding: 4px;
+        background-color: #eee;
+        margin-bottom: 10px;
+      }
   %body
     .row
       .col-sm-2
@@ -45,6 +60,16 @@
           %h1
             File:
             = current_file
+          %h2 Struct details
+          - structs.each do |struct|
+            %h3.struct-heading= struct.type_name
+            %div.struct-def
+              - struct.fields.each do |field|
+                %div= field
+            %div.struct-desc
+              = preserve do
+                != markdown.render(struct.description)
+            %hr
           %h2 Function details
           - functions.each do |function|
             %h3.fn-heading

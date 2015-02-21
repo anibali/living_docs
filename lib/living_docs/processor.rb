@@ -9,6 +9,7 @@ require 'erubis'
 require 'living_docs/utils'
 require 'living_docs/markdown'
 require 'living_docs/documentation/function'
+require 'living_docs/documentation/struct'
 require 'living_docs/code_example'
 
 module LivingDocs
@@ -27,6 +28,7 @@ module LivingDocs
       ).select {|f| File.file?(f)}.to_set
 
       @documented_functions = {}
+      @documented_structs = {}
 
       @index = FFI::Clang::Index.new
     end
@@ -48,14 +50,11 @@ module LivingDocs
             # p cursor.spelling
             # p cursor.underlying_type.spelling
           elsif cursor.kind == :cursor_struct
-            # # TODO: anonymous if cursor.spelling == ""
-            # puts cursor.type.spelling
-            # cursor.visit_children do |child|
-            #   if child.kind == :cursor_field_decl
-            #     puts child.type.spelling, child.spelling
-            #   end
-            #   :recurse
-            # end
+            struct_name = cursor.type.spelling
+
+            if !@documented_structs[short_file] or !@documented_structs[short_file].has_key?(struct_name)
+              (@documented_structs[short_file] ||= {})[struct_name] = Documentation::Struct.new(cursor)
+            end
           elsif cursor.kind == :cursor_function
             function_name = cursor.spelling
 
@@ -183,9 +182,16 @@ module LivingDocs
           functions = []
         end
 
+        if @documented_structs[file]
+          structs = @documented_structs[file].values.sort_by(&:type_name)
+        else
+          structs = []
+        end
+
         html = haml.render(Object.new,
           markdown: markdown,
           functions: functions,
+          structs: structs,
           current_file: file,
           files: files)
 

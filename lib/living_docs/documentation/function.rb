@@ -4,7 +4,7 @@ require 'living_docs/documentation/entity'
 module LivingDocs
   module Documentation
     class Function < Entity
-      attr_accessor :name, :parameters, :return_type
+      attr_reader :name, :parameters, :return_type
 
       def initialize(cursor, file)
         raise unless cursor.kind == :cursor_function
@@ -25,11 +25,6 @@ module LivingDocs
           @description = ""
           @examples = []
         end
-      end
-
-      def merge(other)
-        # TODO: Make this smarter
-        self.description.size > other.description.size ? self : other
       end
     end
   end
