@@ -1,11 +1,8 @@
 require 'living_docs/utils'
+require 'living_docs/documentation/entity'
 
 module LivingDocs
   module Documentation
-    class Entity
-      attr_accessor :description, :examples
-    end
-
     class Function < Entity
       attr_accessor :name, :parameters, :return_type
 

@@ -8,7 +8,7 @@ require 'erubis'
 
 require 'living_docs/utils'
 require 'living_docs/markdown'
-require 'living_docs/documentation'
+require 'living_docs/documentation/function'
 require 'living_docs/code_example'
 
 module LivingDocs
@@ -29,9 +29,6 @@ module LivingDocs
       @documented_functions = {}
 
       @index = FFI::Clang::Index.new
-
-      @renderer = Markdown::HtmlRenderer.new('c')
-      @markdown = Redcarpet::Markdown.new(@renderer, Markdown::OPTIONS)
     end
 
     def process_file(file_path)
@@ -66,15 +63,15 @@ module LivingDocs
 
             # Don't reprocess code we've already parsed
             if @documented_functions[short_file] and @documented_functions[short_file].has_key?(function_name)
-              unit_functions[short_file] << @documented_functions.fetch(short_file).fetch(function_name)
-              next :recurse
+              unit_functions[short_file] << @documented_functions[short_file][function_name]
+            else
+              unit_functions[short_file] << Documentation::Function.new(cursor, short_file)
             end
-
-            unit_functions[short_file] << Documentation::Function.new(cursor, short_file)
           end
         end
 
-        :recurse
+        # We only care about top-level stuff, no need to recurse
+        :continue
       end
 
       # Merge all documentation for functions with the same name in this
@@ -115,12 +112,15 @@ module LivingDocs
 
         FileUtils.cp(Utils.resource_path("living_docs.h"), tmp_include_dir)
 
+        examples_with_function_name = @documented_functions
+          .values
+          .flat_map {|functions_in_file| functions_in_file.values}
+          .flat_map {|fn| Array.new(fn.examples.size, fn.name).zip(fn.examples)}
+          .uniq
+
         example_function_names = []
         example_function_defs = {}
 
-        examples_with_function_name = @documented_functions
-          .flat_map {|k, v| v.values.flat_map {|fn| fn.examples.map {|example| [fn.name, example]}}}
-          .uniq
         examples_with_function_name.each_with_index do |(function_name, example), i|
           example_function_name = "__example_#{function_name}_#{i}"
           example_function_names << example_function_name
@@ -173,18 +173,25 @@ module LivingDocs
       files = @project_files.map {|file| Utils.relative_path(file, @input_dir)}.sort
       haml = Haml::Engine.new(File.read(Utils.resource_path("index.haml")))
 
+      markdown = Redcarpet::Markdown.new(
+        Markdown::HtmlRenderer.new('c'), Markdown::OPTIONS)
+
       files.each do |file|
         if @documented_functions[file]
           functions = @documented_functions[file].values.sort_by(&:name)
         else
           functions = []
         end
+
         html = haml.render(Object.new,
-          markdown: @markdown,
+          markdown: markdown,
           functions: functions,
           current_file: file,
           files: files)
-        open(File.join(@output_dir, file.gsub(/\W/, "_") + ".html"), 'w') {|f| f.puts(html) }
+
+        open(File.join(@output_dir, file.gsub(/\W/, "_") + ".html"), 'w') do |f|
+          f.puts(html)
+        end
       end
 
       EXIT_SUCCESS
