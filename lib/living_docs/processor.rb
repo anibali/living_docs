@@ -17,7 +17,10 @@ module LivingDocs
     EXIT_SUCCESS = 0
     EXIT_FAILURE = 1
 
-    def initialize(input_dir, output_dir)
+    def initialize(input_dir, output_dir, options = {})
+      @compiler = options[:compiler]
+      @cflags = options[:cflags] == "" ? nil : options[:cflags]
+
       @output_dir = File.absolute_path(output_dir)
       @input_dir = File.absolute_path(input_dir)
       @src_dir = File.join(input_dir, "src")
@@ -157,11 +160,12 @@ module LivingDocs
 
         # Compile
         command = [
-          "clang",
-          *Dir[File.join(tmp_src_dir, "**/*.c")],
+          @compiler,
+          @cflags,
           "-o", File.join(@output_dir, "run_examples"),
           "-I", tmp_include_dir,
-          "-Wl,-e,__living_docs_entry_point"]
+          "-Wl,-e,__living_docs_entry_point",
+          *Dir[File.join(tmp_src_dir, "**/*.c")]].compact
         puts command.join(" ")
         IO.popen(command) {|f| puts f.read}
         compile_status = $?.exitstatus
