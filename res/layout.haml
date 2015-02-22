@@ -1,0 +1,67 @@
+%html
+  %head
+    %title Living docs
+    %link(rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.2/css/bootstrap.min.css")
+    %link(rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.2/css/bootstrap-theme.min.css")
+    %script(src="https://code.jquery.com/jquery-1.11.2.min.js")
+    %script(src="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.2/js/bootstrap.min.js")
+    %style= Pygments.css('.highlight', :style => "default")
+    :css
+      .highlight pre {
+        background-color: inherit;
+        border: none;
+      }
+      .highlight {
+        border-left: 1px #bbb solid;
+      }
+      #sidebar {
+        padding: 6px;
+      }
+      #sidebar .list-group-item {
+        overflow-wrap: break-word;
+      }
+      #sneaky-nav {
+        padding-right: 6px;
+      }
+      #content {
+        padding: 6px;
+      }
+      #content h2 {
+        font-size: 1.5em;
+        border-bottom: 1px #bbb solid;
+      }
+      #content .fn-heading {
+        font-size: 1.1em;
+        background-color: #ddeeff;
+        padding: 6px;
+        border-radius: 4px;
+        font-family: monospace;
+        border: 1px #bbb solid;
+      }
+      #content .struct-heading {
+        font-size: 1.1em;
+        background-color: #eeffdd;
+        padding: 6px;
+        border-radius: 4px;
+        font-family: monospace;
+        border: 1px #bbb solid;
+      }
+      #content .struct-def {
+        font-family: monospace;
+        border: 1px solid #ccc;
+        padding: 4px;
+        background-color: #eee;
+        margin-bottom: 10px;
+      }
+  %body
+    .row
+      .col-sm-2
+        #sidebar
+          .list-group
+            - files.each do |file|
+              %a.list-group-item{href: file.gsub(/\W/, "_") + ".html", class: file == current_file ? "active" : ""}
+                = file
+      .col-sm-10
+        #sneaky-nav.pull-right
+          %a(href="index.html") Index
+        #content!= content

@@ -1,0 +1,24 @@
+%h1
+  File:
+  = current_file
+%h2 Struct details
+- structs.each do |struct|
+  %h3.struct-heading= struct.type_name
+  %div.struct-def
+    - struct.fields.each do |field|
+      %div= field
+  %div.struct-desc
+    = preserve do
+      != markdown.render(struct.description)
+  %hr
+%h2 Function details
+- functions.each do |function|
+  %h3.fn-heading
+    %b= function.name
+    = "(" + function.parameters.join(", ") + ")"
+    &rarr;
+    = function.return_type
+  %div.fn-desc
+    = preserve do
+      != markdown.render(function.description)
+  %hr

@@ -177,7 +177,8 @@ module LivingDocs
       return EXIT_FAILURE if @compile_examples and !compile_status.zero?
 
       files = @project_files.map {|file| Utils.relative_path(file, @input_dir)}.sort
-      haml = Haml::Engine.new(File.read(Utils.resource_path("index.haml")))
+      file_doc_haml = Haml::Engine.new(File.read(Utils.resource_path("file_doc.haml")))
+      layout_haml = Haml::Engine.new(File.read(Utils.resource_path("layout.haml")))
 
       markdown = Redcarpet::Markdown.new(
         Markdown::HtmlRenderer.new('c'), Markdown::OPTIONS)
@@ -195,16 +196,40 @@ module LivingDocs
           structs = []
         end
 
-        html = haml.render(Object.new,
+        file_doc_html = file_doc_haml.render(Object.new,
           markdown: markdown,
           functions: functions,
           structs: structs,
+          current_file: file)
+
+        html = layout_haml.render(Object.new,
+          content: file_doc_html,
           current_file: file,
           files: files)
 
         open(File.join(@output_dir, file.gsub(/\W/, "_") + ".html"), 'w') do |f|
           f.puts(html)
         end
+      end
+
+      index_haml = Haml::Engine.new(File.read(Utils.resource_path("index.haml")))
+
+      readme_path = File.join(@input_dir, "README.md")
+
+      if File.exists?(readme_path)
+        readme = markdown.render(File.read(readme_path))
+      end
+
+      index_html = index_haml.render(Object.new,
+        readme: readme)
+
+      html = layout_haml.render(Object.new,
+        content: index_html,
+        current_file: nil,
+        files: files)
+
+      open(File.join(@output_dir, "index.html"), 'w') do |f|
+        f.puts(html)
       end
 
       EXIT_SUCCESS
