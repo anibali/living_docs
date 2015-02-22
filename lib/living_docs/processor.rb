@@ -18,6 +18,7 @@ module LivingDocs
     EXIT_FAILURE = 1
 
     def initialize(input_dir, output_dir, options = {})
+      @compile_examples = options[:compile_examples]
       @compiler = options[:compiler]
       @cflags = options[:cflags] == "" ? nil : options[:cflags]
 
@@ -159,19 +160,21 @@ module LivingDocs
         end
 
         # Compile
-        command = [
-          @compiler,
-          @cflags,
-          "-o", File.join(@output_dir, "run_examples"),
-          "-I", tmp_include_dir,
-          "-Wl,-e,__living_docs_entry_point",
-          *Dir[File.join(tmp_src_dir, "**/*.c")]].compact
-        puts command.join(" ")
-        IO.popen(command) {|f| puts f.read}
-        compile_status = $?.exitstatus
+        if @compile_examples
+          command = [
+            @compiler,
+            @cflags,
+            "-o", File.join(@output_dir, "run_examples"),
+            "-I", tmp_include_dir,
+            "-Wl,-e,__living_docs_entry_point",
+            *Dir[File.join(tmp_src_dir, "**/*.c")]].compact
+          puts command.join(" ")
+          IO.popen(command) {|f| puts f.read}
+          compile_status = $?.exitstatus
+        end
       end
 
-      return EXIT_FAILURE unless compile_status.zero?
+      return EXIT_FAILURE if @compile_examples and !compile_status.zero?
 
       files = @project_files.map {|file| Utils.relative_path(file, @input_dir)}.sort
       haml = Haml::Engine.new(File.read(Utils.resource_path("index.haml")))

@@ -7,6 +7,7 @@ module LivingDocs
   class << self
     def parse_options(argv)
       options = {
+        compile_examples: true,
         compiler: "clang",
         cflags: ""
       }
@@ -29,6 +30,7 @@ module LivingDocs
 
         opts.on("-h", "--help", "Show this help message") {puts opts; exit}
         opts.on("-v", "--version", "Show version") {puts VERSION; exit}
+        opts.on("-n", "--no-examples", "Do not compile examples") {|c| options[:compile_examples] = false}
         opts.on("-i", "--input INPUT_DIR", "Input directory") {|c| input_dir = c}
         opts.on("--compiler COMPILER", "Compiler (default=clang)") {|c| options[:compiler] = c}
         opts.on("--cflags CFLAGS", "Compiler flags") {|c| options[:cflags] = c}
